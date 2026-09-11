@@ -41,11 +41,11 @@ int ExecVp(const char* file, char* const argv[])
     // on the parent (e.g. a test framework) sees it exit with code 0 before the
     // child finishes. Use _P_NOWAIT + _cwait instead of _P_WAIT so a child exit
     // code of -1 is not confused with a spawn failure (both return -1 with _P_WAIT).
-    intptr_t child{_spawnvp(_P_NOWAIT, file, new_argv.data())};
-    if (child == -1) return -1;
-    int status{0};
-    if (_cwait(&status, child, _WAIT_CHILD) == -1) return -1;
-    _exit(status); // forward child exit code; never returns
+    // PROBE: the pre-fix launcher, _spawnvp(_P_WAIT). Not for upstream — this
+    // exists only to confirm the functional test catches the regression.
+    intptr_t ret{_spawnvp(_P_WAIT, file, new_argv.data())};
+    if (ret == -1) return -1;
+    _exit(ret); // forward child exit code; never returns
 #endif
 }
 

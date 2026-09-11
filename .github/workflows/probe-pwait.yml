@@ -1,0 +1,123 @@
+# PROBE only, not for upstream. Confirms that the functional test in #36190
+# catches the pre-fix launcher (_spawnvp(_P_WAIT)).
+#
+# The wrapper is the only binary that changes, and it links just bitcoin_common
+# and bitcoin_util — no external dependencies. So instead of a full cross build
+# (1h50m without warm caches), build only the `bitcoin` target with the mingw
+# toolchain from apt (~2 min) and drop it into the executables from the earlier
+# run 34567894525, which already carry the test.
+name: PROBE pwait
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'probe-pwait'
+
+jobs:
+  build-wrapper:
+    name: 'PROBE, build pre-fix wrapper (mingw, msvcrt)'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install mingw toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-x86-64-posix binutils-mingw-w64-x86-64
+
+      - name: Configure
+        run: |
+          cmake -B build-min \
+            -DCMAKE_SYSTEM_NAME=Windows \
+            -DCMAKE_SYSTEM_PROCESSOR=x86_64 \
+            -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc-posix \
+            -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++-posix \
+            -DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_DAEMON=OFF -DBUILD_CLI=OFF -DBUILD_TX=OFF -DBUILD_UTIL=OFF \
+            -DBUILD_WALLET_TOOL=OFF -DENABLE_WALLET=OFF -DBUILD_TESTS=OFF \
+            -DBUILD_BENCH=OFF -DBUILD_FUZZ_BINARY=OFF -DENABLE_IPC=OFF \
+            -DWITH_ZMQ=OFF -DBUILD_GUI=OFF
+
+      - name: Build the wrapper only
+        run: cmake --build build-min --target bitcoin -j"$(nproc)"
+
+      - name: Show what was built
+        run: |
+          ls -la build-min/bin/
+          x86_64-w64-mingw32-objdump -p build-min/bin/bitcoin.exe | grep -i "DLL Name:" || true
+
+      - name: Upload pre-fix wrapper
+        uses: actions/upload-artifact@v7
+        with:
+          name: probe-pwait-wrapper
+          path: build-min/bin/bitcoin.exe
+
+  test:
+    name: 'PROBE, msvcrt, test against pre-fix wrapper'
+    runs-on: windows-2022
+    needs: build-wrapper
+    env:
+      PYTHONUTF8: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download executables from the earlier run
+        uses: actions/download-artifact@v8
+        with:
+          name: x86_64-w64-mingw32-executables-34567894525
+          run-id: 34567894525
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download the pre-fix wrapper
+        uses: actions/download-artifact@v8
+        with:
+          name: probe-pwait-wrapper
+          path: prefix-wrapper
+
+      - name: Swap in the pre-fix wrapper
+        shell: bash
+        run: |
+          ls -la bin/bitcoin.exe prefix-wrapper/bitcoin.exe
+          cp prefix-wrapper/bitcoin.exe bin/bitcoin.exe
+          ls -la bin/bitcoin.exe
+
+      - name: Run bitcoin.exe -v
+        continue-on-error: true
+        run: bin\bitcoin.exe -v
+
+      - name: Point config.ini at the workspace
+        shell: bash
+        run: |
+          python - <<'EOF'
+          from pathlib import Path
+          ws = Path.cwd()
+          p = ws / "test" / "config.ini"
+          lines = p.read_text().splitlines()
+          repl = {"SRCDIR=": f"SRCDIR={ws}", "BUILDDIR=": f"BUILDDIR={ws}",
+                  "RPCAUTH=": f"RPCAUTH={ws / 'share' / 'rpcauth' / 'rpcauth.py'}"}
+          for i, line in enumerate(lines):
+              for pref, val in repl.items():
+                  if line.startswith(pref):
+                      lines[i] = val
+                      break
+          p.write_text("\n".join(lines) + "\n")
+          EOF
+
+      # Expected to FAIL: that is the point. The step is inverted so a green job
+      # means "the test caught the pre-fix launcher".
+      - name: Run tool_bitcoin.py (expected to fail)
+        shell: bash
+        run: |
+          set +e
+          py -3 test/functional/tool_bitcoin.py --configfile=test/config.ini --tmpdir="${RUNNER_TEMP}/tb-pwait" 2>&1 | tee out.txt
+          rc=${PIPESTATUS[0]}
+          echo "--- test exit code: $rc ---"
+          if [ "$rc" -eq 0 ]; then
+            echo "UNEXPECTED: the test passed against the pre-fix wrapper"
+            exit 1
+          fi
+          echo "EXPECTED: the test failed against the pre-fix wrapper"
