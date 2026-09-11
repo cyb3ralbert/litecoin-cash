@@ -1,0 +1,61 @@
+# PROBE only, not for upstream. Reuses the executables built by run 34567894525
+# and runs tool_bitcoin.py directly, so the test's own log (with the exact
+# stderr of the launch-failure case) lands in the job output.
+name: PROBE direct test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  direct:
+    name: 'PROBE, ${{ matrix.crt }}, direct tool_bitcoin.py'
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        crt: [msvcrt, ucrt]
+        include:
+          - crt: msvcrt
+            artifact-name: 'x86_64-w64-mingw32-executables-34567894525'
+          - crt: ucrt
+            artifact-name: 'x86_64-w64-mingw32ucrt-executables-34567894525'
+
+    env:
+      PYTHONUTF8: 1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download executables from the earlier run
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix.artifact-name }}
+          run-id: 34567894525
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run bitcoind.exe
+        run: py -3 .github/ci-windows-cross.py print_version
+
+      - name: Point config.ini at the workspace
+        shell: bash
+        run: |
+          python - <<'EOF'
+          from pathlib import Path
+          ws = Path.cwd()
+          p = ws / "test" / "config.ini"
+          lines = p.read_text().splitlines()
+          repl = {"SRCDIR=": f"SRCDIR={ws}", "BUILDDIR=": f"BUILDDIR={ws}",
+                  "RPCAUTH=": f"RPCAUTH={ws / 'share' / 'rpcauth' / 'rpcauth.py'}"}
+          for i, line in enumerate(lines):
+              for pref, val in repl.items():
+                  if line.startswith(pref):
+                      lines[i] = val
+                      break
+          p.write_text("\n".join(lines) + "\n")
+          print(p.read_text())
+          EOF
+
+      - name: Run tool_bitcoin.py directly
+        run: |
+          py -3 test/functional/tool_bitcoin.py --configfile=test/config.ini --tmpdir="${{ runner.temp }}/tb-direct"
