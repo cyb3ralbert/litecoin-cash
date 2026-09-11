@@ -418,18 +418,22 @@ jobs:
         if: false  # PROBE: disabled
         run: py -3 .github/ci-windows-cross.py run_unit_tests
 
-      # PROBE: only tool_bitcoin.py, and run the runner directly so the
-      # ancient-release tests at the end of run_functional_tests are skipped.
-      - name: Run functional tests
+      # PROBE: this branch reverts ExecVp to _spawnvp(_P_WAIT), so the test is
+      # EXPECTED TO FAIL. The step is inverted: a green job means the test
+      # caught the pre-fix launcher. Run the test directly (not through
+      # test_runner) so its own log lands in the job output.
+      - name: Run tool_bitcoin.py against the pre-fix wrapper (expected to fail)
+        shell: bash
         run: |
-          py -3 test/functional/test_runner.py --timeout-factor=40 --combinedlogslen=99999999 "--tmpdirprefix=_ _" tool_bitcoin.py
-
-      # PROBE: run the test directly too, so its own log (with the exact stderr
-      # of the launch-failure case) lands in the job output. test_runner only
-      # prints test logs when a test fails.
-      - name: Run functional test directly to show its log
-        run: |
-          py -3 test/functional/tool_bitcoin.py --configfile=test/config.ini --tmpdir="${{ runner.temp }}/tb-direct"
+          set +e
+          py -3 test/functional/tool_bitcoin.py --configfile=test/config.ini --tmpdir="${RUNNER_TEMP}/tb-pwait" 2>&1 | tee out.txt
+          rc=${PIPESTATUS[0]}
+          echo "--- test exit code: $rc ---"
+          if [ "$rc" -eq 0 ]; then
+            echo "UNEXPECTED: the test passed against the pre-fix wrapper"
+            exit 1
+          fi
+          echo "EXPECTED: the test failed against the pre-fix wrapper"
 
   ci-matrix:
     name: ${{ matrix.name }}
