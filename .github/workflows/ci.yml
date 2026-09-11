@@ -424,6 +424,13 @@ jobs:
         run: |
           py -3 test/functional/test_runner.py --timeout-factor=40 --combinedlogslen=99999999 "--tmpdirprefix=_ _" tool_bitcoin.py
 
+      # PROBE: run the test directly too, so its own log (with the exact stderr
+      # of the launch-failure case) lands in the job output. test_runner only
+      # prints test logs when a test fails.
+      - name: Run functional test directly to show its log
+        run: |
+          py -3 test/functional/tool_bitcoin.py --configfile=test/config.ini --tmpdir="${{ runner.temp }}/tb-direct"
+
   ci-matrix:
     name: ${{ matrix.name }}
     runs-on: ${{ github.repository == 'bitcoin/bitcoin' && matrix.warp-runner || matrix.fallback-runner }}
