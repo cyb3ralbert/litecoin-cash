@@ -5,6 +5,9 @@ name: PROBE direct test
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - 'probe-36190-notfound'
 
 jobs:
   direct:
