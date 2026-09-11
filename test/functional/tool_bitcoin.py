@@ -71,6 +71,22 @@ class ToolBitcoinTest(BitcoinTestFramework):
             assert_equal(result.stdout, b"")
             assert_equal(result.stderr, b"")
 
+        # The other half of what _P_NOWAIT + _cwait separates: a child that
+        # could not be launched at all must be reported as a wrapper error, not
+        # forwarded as a child exit status. Leave the internal executable out so
+        # the lookup fails. The wrapper is invoked by absolute path, so it does
+        # not fall back to searching PATH.
+        self.log.info("Ensure bitcoin reports a launch failure instead of a child exit status")
+        missing_dir = self.nodes[0].datadir_path / "exit_status_missing"
+        missing_dir.mkdir()
+        missing_wrapper = missing_dir / "bitcoin.exe"
+        shutil.copyfile(self.get_binaries().paths.bitcoin_bin, missing_wrapper)
+        result = subprocess.run([str(missing_wrapper), "-M", "node", "-version"],
+                                capture_output=True, timeout=30)
+        self.log.info(f"launch failure: returncode={result.returncode} stderr={result.stderr!r}")
+        assert_equal(result.returncode, 1)
+        assert b"failed to execute" in result.stderr
+
     def run_test(self):
         node = self.nodes[0]
 
