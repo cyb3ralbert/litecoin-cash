@@ -25,7 +25,7 @@ jobs:
       - name: Install mingw toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++-mingw-w64-x86-64-posix binutils-mingw-w64-x86-64
+          sudo apt-get install -y g++-mingw-w64-x86-64-posix binutils-mingw-w64-x86-64 libboost-dev
 
       - name: Configure
         run: |
@@ -36,6 +36,8 @@ jobs:
             -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++-posix \
             -DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH \
+            -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH \
             -DBUILD_DAEMON=OFF -DBUILD_CLI=OFF -DBUILD_TX=OFF -DBUILD_UTIL=OFF \
             -DBUILD_WALLET_TOOL=OFF -DENABLE_WALLET=OFF -DBUILD_TESTS=OFF \
             -DBUILD_BENCH=OFF -DBUILD_FUZZ_BINARY=OFF -DENABLE_IPC=OFF \
