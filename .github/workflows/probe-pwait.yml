@@ -29,7 +29,14 @@ jobs:
 
       - name: Configure
         run: |
+          # With CMAKE_SYSTEM_NAME=Windows the unix prefixes are not searched,
+          # so point at the host Boost config explicitly. Boost is header-only
+          # here, so host headers are fine for a cross build.
+          find /usr -name BoostConfig.cmake
+          boost_dir="$(dirname "$(find /usr -name BoostConfig.cmake | head -1)")"
+          echo "Boost_DIR=$boost_dir"
           cmake -B build-min \
+            -DBoost_DIR="$boost_dir" \
             -DCMAKE_SYSTEM_NAME=Windows \
             -DCMAKE_SYSTEM_PROCESSOR=x86_64 \
             -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc-posix \
