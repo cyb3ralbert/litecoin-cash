@@ -114,7 +114,7 @@ jobs:
     # one for the branch push and one for the pull request.
     # This can be avoided by setting SKIP_BRANCH_PUSH=true as a custom env variable
     # in Github repository settings.
-    if: ${{ vars.SKIP_BRANCH_PUSH != 'true' || github.event_name == 'pull_request' }}
+    if: false  # cache-warm: not needed
 
     timeout-minutes: 120
 
@@ -197,7 +197,7 @@ jobs:
     name: ${{ matrix.job-name }}
     runs-on: windows-2025-vs2026
 
-    if: ${{ vars.SKIP_BRANCH_PUSH != 'true' || github.event_name == 'pull_request' }}
+    if: false  # cache-warm: not needed
 
     env:
       PYTHONUTF8: 1
@@ -307,7 +307,7 @@ jobs:
     name: 'Windows-cross to x86_64'
     needs: record-frozen-commit
     runs-on: ${{ github.repository == 'bitcoin/bitcoin' && 'warp-ubuntu-latest-x64-4x' || 'ubuntu-latest' }}
-    if: ${{ vars.SKIP_BRANCH_PUSH != 'true' || github.event_name == 'pull_request' }}
+    if: true  # cache-warm: this is the job whose caches we want fresh
 
     env:
       FILE_ENV: './ci/test/00_setup_env_win64.sh'
@@ -357,6 +357,7 @@ jobs:
   windows-native-test:
     name: 'Windows, test cross-built'
     runs-on: windows-2022
+    if: false  # cache-warm: not needed
     needs: [windows-cross, record-frozen-commit]
 
     env:
@@ -402,7 +403,7 @@ jobs:
   ci-matrix:
     name: ${{ matrix.name }}
     runs-on: ${{ github.repository == 'bitcoin/bitcoin' && matrix.warp-runner || matrix.fallback-runner }}
-    if: ${{ vars.SKIP_BRANCH_PUSH != 'true' || github.event_name == 'pull_request' }}
+    if: false  # cache-warm: not needed
     timeout-minutes: ${{ matrix.timeout-minutes }}
 
     env:
@@ -567,7 +568,7 @@ jobs:
   lint:
     name: 'lint'
     runs-on: ${{ github.repository == 'bitcoin/bitcoin' && 'warp-ubuntu-latest-x64-2x' || 'ubuntu-latest' }}
-    if: ${{ vars.SKIP_BRANCH_PUSH != 'true' || github.event_name == 'pull_request' }}
+    if: false  # cache-warm: not needed
     timeout-minutes: 20
     env:
       CONTAINER_NAME: "bitcoin-linter"
