@@ -306,8 +306,8 @@ jobs:
   windows-cross:
     name: 'Windows-cross to x86_64'
     needs: record-frozen-commit
+    if: false  # PROBE: reuse binaries from run 35207920957
     runs-on: ${{ github.repository == 'bitcoin/bitcoin' && 'warp-ubuntu-latest-x64-4x' || 'ubuntu-latest' }}
-    if: true  # PROBE: force run on branch push
 
     env:
       FILE_ENV: './ci/test/00_setup_env_win64.sh'
@@ -357,7 +357,7 @@ jobs:
   windows-native-test:
     name: 'Windows, test cross-built'
     runs-on: windows-2022
-    needs: [windows-cross, record-frozen-commit]
+    needs: [record-frozen-commit]
 
     env:
       PYTHONUTF8: 1
@@ -374,7 +374,9 @@ jobs:
       - name: Download built executables
         uses: actions/download-artifact@v8
         with:
-          name: x86_64-w64-mingw32ucrt-executables-${{ github.run_id }}
+          name: x86_64-w64-mingw32ucrt-executables-35207920957
+          run-id: 35207920957
+          github-token: ${{ github.token }}
 
       - name: Run bitcoind.exe
         run: py -3 .github/ci-windows-cross.py print_version
@@ -413,7 +415,7 @@ jobs:
           mkdir "%RUNNER_TEMP%\eacces"
           copy bin\bitcoin.exe "%RUNNER_TEMP%\eacces\bitcoin.exe"
           mkdir "%RUNNER_TEMP%\eacces\bitcoind.exe"
-          "%RUNNER_TEMP%\eacces\bitcoin.exe" bitcoind -version
+          "%RUNNER_TEMP%\eacces\bitcoin.exe" node -version
           echo exit code: %ERRORLEVEL%
 
       # PROBE: system_category vs generic_category for the same errno, built
@@ -434,7 +436,7 @@ jobs:
               }
           }
           EOF
-          for gxx in /c/msys64/ucrt64/bin/g++.exe /c/msys64/mingw64/bin/g++.exe; do
+          for gxx in /c/msys64/ucrt64/bin/g++.exe /c/msys64/mingw64/bin/g++.exe /c/mingw64/bin/g++.exe; do
             if [ -x "$gxx" ]; then
               echo "--- $gxx ---"
               "$gxx" cat.cpp -o cat_gxx.exe && ./cat_gxx.exe
