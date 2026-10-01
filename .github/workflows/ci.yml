@@ -114,7 +114,7 @@ jobs:
     # one for the branch push and one for the pull request.
     # This can be avoided by setting SKIP_BRANCH_PUSH=true as a custom env variable
     # in Github repository settings.
-    if: ${{ vars.SKIP_BRANCH_PUSH != 'true' || github.event_name == 'pull_request' }}
+    if: false  # fork-ci: off for the Windows probe
 
     timeout-minutes: 120
 
@@ -197,7 +197,7 @@ jobs:
     name: ${{ matrix.job-name }}
     runs-on: windows-2025-vs2026
 
-    if: ${{ vars.SKIP_BRANCH_PUSH != 'true' || github.event_name == 'pull_request' }}
+    if: false  # fork-ci: off for the Windows probe
 
     env:
       PYTHONUTF8: 1
@@ -307,7 +307,7 @@ jobs:
     name: 'Windows-cross to x86_64'
     needs: record-frozen-commit
     runs-on: ${{ github.repository == 'bitcoin/bitcoin' && 'warp-ubuntu-latest-x64-4x' || 'ubuntu-latest' }}
-    if: ${{ vars.SKIP_BRANCH_PUSH != 'true' || github.event_name == 'pull_request' }}
+    if: true  # fork-ci: force run on branch push
 
     env:
       FILE_ENV: './ci/test/00_setup_env_win64.sh'
@@ -391,18 +391,17 @@ jobs:
         run: py -3 .github/ci-windows-cross.py prepare_tests
 
       - name: Run unit tests
+        if: false  # fork-ci: not needed here
         run: py -3 .github/ci-windows-cross.py run_unit_tests
 
       - name: Run functional tests
-        env:
-          TEST_RUNNER_EXTRA: "--timeout-factor=${{ env.TEST_RUNNER_TIMEOUT_FACTOR }} ${{ case(github.event_name == 'pull_request', '', '--extended') }}"
         run: |
-          py -3 .github/ci-windows-cross.py run_functional_tests
+          py -3 test/functional/test_runner.py --timeout-factor=40 --combinedlogslen=99999999 "--tmpdirprefix=_ _" tool_bitcoin.py
 
   ci-matrix:
     name: ${{ matrix.name }}
     runs-on: ${{ github.repository == 'bitcoin/bitcoin' && matrix.warp-runner || matrix.fallback-runner }}
-    if: ${{ vars.SKIP_BRANCH_PUSH != 'true' || github.event_name == 'pull_request' }}
+    if: false  # fork-ci: off for the Windows probe
     timeout-minutes: ${{ matrix.timeout-minutes }}
 
     env:
@@ -567,7 +566,7 @@ jobs:
   lint:
     name: 'lint'
     runs-on: ${{ github.repository == 'bitcoin/bitcoin' && 'warp-ubuntu-latest-x64-2x' || 'ubuntu-latest' }}
-    if: ${{ vars.SKIP_BRANCH_PUSH != 'true' || github.event_name == 'pull_request' }}
+    if: false  # fork-ci: off for the Windows probe
     timeout-minutes: 20
     env:
       CONTAINER_NAME: "bitcoin-linter"
